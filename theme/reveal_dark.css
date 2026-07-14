@@ -1,0 +1,17 @@
+/* org2slides built-in theme "dark" — reveal side, matches neutral_dark.tex */
+:root {
+  --r-background-color: #191919;
+  --r-main-color: #eceef0;
+  --r-heading-color: #eceef0;
+  --r-link-color: #4da3ff;
+  --r-link-color-dark: #2563eb;
+  --r-link-color-hover: #7ee0c3;
+  --r-selection-background-color: #4da3ff;
+}
+:root {
+  --r-main-font: "Source Sans Pro", "Source Sans 3", system-ui, sans-serif;
+  --r-heading-font: "Source Sans Pro", "Source Sans 3", system-ui, sans-serif;
+  --r-heading-text-transform: none;
+  --r-heading-font-weight: 700;
+  --r-heading-letter-spacing: normal;
+}

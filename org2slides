@@ -1,0 +1,237 @@
+#!/usr/bin/env bash
+#
+# org2slides -- export a reveal.js org deck to an HTML presentation AND a
+#              Beamer PDF with one command.
+#
+#   org2slides [options] deck.org [deck2.org ...]
+#
+# Outputs land next to each deck: <deck>.html (reveal.js presentation) and
+# <deck>_beamer.pdf. Decks may live in ANY directory; the built-in Beamer
+# themes and the vendored ox-reveal/htmlize elisp live in this repository and
+# are found automatically (custom themes: see --theme). Designed to be cloned inside a CI pipeline of the
+# repository that holds the presentations (see README.md).
+#
+# Options:
+#   --html         export only the reveal.js HTML
+#   --pdf          export only the Beamer PDF          (default: both)
+#   --debug        keep the intermediate files (<deck>_beamer.org / .tex /
+#                  aux files) and show the full pdflatex output
+#   --theme T      theme: dark (default) | light, or a custom theme shipped
+#                  WITH YOUR DECKS: a directory
+#                  themes/<T>/ next to the deck (or in $ORG2SLIDES_THEMES)
+#                  holding a header.org plus its .sty/.tex/image files
+#   --light        shorthand for --theme light
+#   --dist DIR     additionally bundle a self-contained website into DIR:
+#                  the HTML plus every referenced asset, with images
+#                  downscaled (<=1920px) and videos re-encoded (<=1280px,
+#                  h264 crf 28) for a minimal footprint -- point GitLab
+#                  Pages at it (webdist.py has the size/quality knobs)
+#   -h, --help     show this help
+#
+# Environment:
+#   PDF_COMPRESS=0    skip the Ghostscript compression step
+#   PDF_DPI=300       raster downsample resolution        PDF_JPEGQ=95
+#   REVEAL_VERSION    reveal.js version to auto-download when the deck's
+#                     #+REVEAL_ROOT: points to a local directory that is
+#                     missing (default 5.2.1) -- useful in CI
+#
+# Babel is never executed at export time (:eval never-export): decks export
+# with their committed #+RESULTS figures, reproducibly, on any machine.
+#
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REVEAL_VERSION="${REVEAL_VERSION:-5.2.1}"
+
+DO_HTML=1
+DO_PDF=1
+DEBUG=0
+DIST=""
+THEME=""
+PYFLAGS=()
+DECKS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --html)    DO_PDF=0 ;;
+    --pdf)     DO_HTML=0 ;;
+    --debug)   DEBUG=1 ;;
+    --theme)   THEME="$2"; PYFLAGS+=(--theme "$2"); shift ;;
+    --light)   THEME="light"; PYFLAGS+=(--light) ;;
+    --dist)    DIST="$(realpath -m "$2")"; shift ;;
+    -h|--help) sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*)        echo "unknown option: $1 (see --help)" >&2; exit 2 ;;
+    *)         DECKS+=("$1") ;;
+  esac
+  shift
+done
+if [ "$DO_HTML" = 0 ] && [ "$DO_PDF" = 0 ]; then
+  echo "--html and --pdf together exclude everything; pick one or neither" >&2
+  exit 2
+fi
+[ "${#DECKS[@]}" -gt 0 ] || { echo "no deck given (see --help)" >&2; exit 2; }
+
+# The org exporter setup shared by both backends: never execute babel blocks
+# (use the committed #+RESULTS figures), tolerate broken links, no backups.
+EMACS_SETUP="(progn
+  (require 'org)
+  (setq org-confirm-babel-evaluate nil
+        org-export-use-babel t
+        org-babel-default-header-args
+          (cons '(:eval . \"never-export\")
+                (assq-delete-all :eval org-babel-default-header-args))
+        org-export-with-broken-links t
+        make-backup-files nil)"
+
+# ---------------------------------------------------------------------------
+# reveal.js HTML export
+# ---------------------------------------------------------------------------
+ensure_reveal_root() {   # $1 = deck filename (cwd is the deck's directory)
+  local root
+  root="$(grep -im1 '^#+REVEAL_ROOT:' "$1" | sed 's/^[^:]*: *//;s/ *$//' || true)"
+  case "$root" in
+    ""|http*|//*) return 0 ;;                       # CDN / absent -> nothing to do
+  esac
+  [ -e "$root/dist/reveal.css" ] && return 0
+  echo "  fetching reveal.js ${REVEAL_VERSION} into ${root}"
+  mkdir -p "$root"
+  curl -fsSL "https://github.com/hakimel/reveal.js/archive/refs/tags/${REVEAL_VERSION}.tar.gz" \
+    | tar -xz --strip-components=1 -C "$root"
+}
+
+export_html() {          # $1 = deck filename (cwd is the deck's directory)
+  ensure_reveal_root "$1"
+  # With --theme, ship a matching reveal CSS (built-in: theme/reveal_<T>.css;
+  # custom: themes/<T>/reveal.css if the theme provides one) next to the deck
+  # and inject it as an extra stylesheet -- the HTML mirrors the PDF look.
+  # The source deck is never modified (the keyword is added in-buffer only).
+  local inject=""
+  if [ -n "$THEME" ]; then
+    local css=""
+    for cand in "$SCRIPT_DIR/theme/reveal_${THEME}.css" "themes/${THEME}/reveal.css"; do
+      [ -f "$cand" ] && css="$cand" && break
+    done
+    if [ -n "$css" ]; then
+      cp "$css" org2slides-theme.css
+      echo "  reveal theme css: $css"
+      inject="(goto-char (point-max)) (insert \"\\n#+REVEAL_EXTRA_CSS: ./org2slides-theme.css\\n\")"
+    fi
+  fi
+  emacs -Q --batch \
+    --load "$SCRIPT_DIR/vendor/htmlize.el" \
+    --load "$SCRIPT_DIR/vendor/ox-reveal.el" \
+    --eval "${EMACS_SETUP}
+              (find-file \"$1\")
+              ${inject}
+              (org-reveal-export-to-html))"
+}
+
+# ---------------------------------------------------------------------------
+# Beamer PDF export (reveal org -> derived beamer org -> tex -> pdf)
+# ---------------------------------------------------------------------------
+run_pdflatex() {         # $1 = tex basename (without .tex)
+  if [ "$DEBUG" = 1 ]; then
+    pdflatex -interaction=nonstopmode -halt-on-error "$1.tex"
+  elif ! pdflatex -interaction=nonstopmode -halt-on-error "$1.tex" >/dev/null; then
+    echo "pdflatex failed; errors from $1.log:" >&2
+    grep -B1 -A4 '^!' "$1.log" >&2 || tail -40 "$1.log" >&2
+    echo "(intermediate files kept; re-run with --debug for full output)" >&2
+    exit 1
+  fi
+}
+
+export_pdf() {           # $1 = absolute deck path (cwd is the deck's directory)
+  local base
+  base="$(basename "${1%.org}")_beamer"
+
+  # Prefer a venv (this repo's, else the deck directory's) -- cairosvg for the
+  # SVG -> vector-PDF conversion usually lives there.
+  local py=python3
+  if [ -x "$SCRIPT_DIR/.venv/bin/python" ]; then
+    py="$SCRIPT_DIR/.venv/bin/python"
+  elif [ -x ".venv/bin/python" ]; then
+    py=".venv/bin/python"
+  fi
+  "$py" "$SCRIPT_DIR/convert_to_beamer.py" "${PYFLAGS[@]}" -o "${base}.org" "$1"
+
+  emacs -Q --batch \
+    --eval "${EMACS_SETUP}
+              (require 'ox-beamer)
+              (find-file \"${base}.org\")
+              (org-beamer-export-to-latex))"
+
+  run_pdflatex "$base"
+  run_pdflatex "$base"
+
+  # Shrink the PDF: downsample oversized raster images and JPEG-recompress;
+  # vector diagrams and text are untouched.
+  local pdf_dpi="${PDF_DPI:-300}" pdf_jpegq="${PDF_JPEGQ:-95}" gs=""
+  # The PATH `gs` may be shadowed (e.g. by the genesis CLI); find a real Ghostscript.
+  for cand in /usr/bin/gs ghostscript gs; do
+    if command -v "$cand" >/dev/null 2>&1 && "$cand" --version 2>/dev/null | grep -qE '^[0-9]'; then
+      gs="$cand"; break
+    fi
+  done
+  if [ "${PDF_COMPRESS:-1}" = "1" ] && [ -n "$gs" ]; then
+    echo "  compressing pdf (${pdf_dpi} dpi, q${pdf_jpegq}) with $gs"
+    if "$gs" -sDEVICE=pdfwrite -dCompatibilityLevel=1.5 -dNOPAUSE -dBATCH -dQUIET \
+         -dDownsampleColorImages=true -dColorImageDownsampleType=/Bicubic -dColorImageResolution="$pdf_dpi" \
+         -dDownsampleGrayImages=true  -dGrayImageDownsampleType=/Bicubic  -dGrayImageResolution="$pdf_dpi" \
+         -dDownsampleMonoImages=true  -dMonoImageDownsampleType=/Subsample -dMonoImageResolution=300 \
+         -dAutoFilterColorImages=false -dColorImageFilter=/DCTEncode \
+         -dAutoFilterGrayImages=false  -dGrayImageFilter=/DCTEncode \
+         -dJPEGQ="$pdf_jpegq" -dEmbedAllFonts=true -dSubsetFonts=true \
+         -sOutputFile="${base}.min.pdf" "${base}.pdf" \
+       && [ -s "${base}.min.pdf" ] \
+       && [ "$(pdfinfo "${base}.min.pdf" 2>/dev/null | awk '/Pages/{print $2}')" \
+          = "$(pdfinfo "${base}.pdf" 2>/dev/null | awk '/Pages/{print $2}')" ]; then
+      mv "${base}.min.pdf" "${base}.pdf"
+    else
+      echo "  ghostscript step failed; keeping the uncompressed pdf"; rm -f "${base}.min.pdf"
+    fi
+  elif [ -z "$gs" ]; then
+    echo "  ghostscript not found; skipping compression"
+  fi
+
+  # Only the PDF is the deliverable: drop the derived org/tex and LaTeX aux
+  # files unless --debug asked to keep them for inspection.
+  if [ "$DEBUG" = 0 ]; then
+    rm -f "${base}.org" "${base}.tex" "${base}.aux" "${base}.log" "${base}.nav" \
+          "${base}.out" "${base}.snm" "${base}.toc" "${base}.vrb" "${base}".*.vrb \
+          "${base}.fls" "${base}.bbl" "${base}.blg" "${base}.bcf" "${base}.run.xml"
+  fi
+  echo "  pdf  -> $(pwd)/${base}.pdf ($(du -h "${base}.pdf" | cut -f1))"
+}
+
+# ---------------------------------------------------------------------------
+# Drive: each deck exports in its own directory
+# ---------------------------------------------------------------------------
+# Themes are resolved through TEXINPUTS (trailing `:` keeps the defaults):
+# built-ins live in this repo's theme/, custom themes in themes/ next to the
+# deck or in $ORG2SLIDES_THEMES (set per deck inside the loop).
+TEXINPUTS_BASE="${SCRIPT_DIR}//:${ORG2SLIDES_THEMES:+${ORG2SLIDES_THEMES}//:}${TEXINPUTS:-}"
+
+for deck in "${DECKS[@]}"; do
+  case "$deck" in *_beamer.org) continue ;; esac    # derived file, not a deck
+  [ -f "$deck" ] || { echo "deck not found: $deck" >&2; exit 1; }
+  deck="$(realpath "$deck")"
+  echo "== $deck"
+  (
+    cd "$(dirname "$deck")"
+    name="$(basename "$deck")"
+    export TEXINPUTS="./themes//:${TEXINPUTS_BASE}"
+    if [ "$DO_HTML" = 1 ]; then
+      export_html "$name"
+      echo "  html -> ${deck%.org}.html"
+      if [ -n "$DIST" ]; then
+        python3 "$SCRIPT_DIR/webdist.py" --dist "$DIST" "${name%.org}.html"
+      fi
+    fi
+    if [ "$DO_PDF" = 1 ]; then
+      export_pdf "$deck"
+      if [ -n "$DIST" ]; then
+        mkdir -p "$DIST"
+        cp "$(basename "${deck%.org}")_beamer.pdf" "$DIST/"
+      fi
+    fi
+  )
+done

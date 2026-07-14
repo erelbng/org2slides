@@ -1,0 +1,65 @@
+# Reusable org2slides jobs for GitLab CI.
+#
+# In a presentation repository's .gitlab-ci.yml:
+#
+#   include:
+#     - project: 'you/org2slides'          # <- adjust to where org2slides lives
+#       file: 'ci/org2slides.gitlab-ci.yml'
+#
+#   pages:                                # publish decks with GitLab Pages
+#     extends: .org2slides-pages
+#
+#   # and/or plain downloadable artifacts (HTML + PDF next to the sources):
+#   export:
+#     extends: .org2slides-export
+#
+# Override DECKS to select which decks to build (default: every *.org in the
+# repository root), ORG2SLIDES_REPO if org2slides lives elsewhere.
+
+.org2slides-base:
+  image: debian:trixie-slim
+  variables:
+    ORG2SLIDES_REPO: "https://${CI_SERVER_HOST}/you/org2slides.git"
+    DECKS: "*.org"
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends
+      git ca-certificates curl emacs-nox python3 python3-cairosvg
+      texlive-latex-extra texlive-fonts-extra texlive-pictures
+      texlive-plain-generic texlive-bibtex-extra texlive-lang-german
+      ffmpeg imagemagick ghostscript poppler-utils
+    - git clone --depth 1 "$ORG2SLIDES_REPO" /opt/org2slides
+
+# HTML + PDF as plain job artifacts, next to the deck sources.
+.org2slides-export:
+  extends: .org2slides-base
+  script:
+    - /opt/org2slides/org2slides $DECKS
+  artifacts:
+    paths:
+      - "*.html"
+      - "*_beamer.pdf"
+      - assets/
+      - revealjs/
+      - custom_components/
+
+# Self-contained minimal website in public/ (GitLab Pages layout): only the
+# files the decks actually reference, images downscaled, videos re-encoded.
+# The cache keeps re-encoded videos between pipelines; webdist is run with
+# --reuse there, so bump the key (or clear the cache) after replacing a video
+# with a same-named file.
+.org2slides-pages:
+  extends: .org2slides-base
+  cache:
+    key: org2slides-media
+    paths:
+      - public/
+  script:
+    - /opt/org2slides/org2slides --html $DECKS
+    - for d in $DECKS; do
+        python3 /opt/org2slides/webdist.py --dist public --reuse "${d%.org}.html";
+      done
+    - /opt/org2slides/org2slides --pdf $DECKS
+    - cp ./*_beamer.pdf public/
+  artifacts:
+    paths:
+      - public

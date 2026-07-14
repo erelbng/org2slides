@@ -1,0 +1,94 @@
+# Build the example decks on every push — a smoke test of the whole
+# workflow (reveal HTML + Beamer PDF + webdist bundle) — and publish the
+# result as a live demo via GitHub Pages.
+#
+# One-time repo setup for the Pages deploy: Settings → Pages → Source:
+# "GitHub Actions".
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            emacs-nox python3-cairosvg \
+            texlive-latex-extra texlive-fonts-extra texlive-pictures \
+            texlive-plain-generic texlive-bibtex-extra texlive-lang-german \
+            ffmpeg imagemagick ghostscript poppler-utils curl
+
+      - name: Export example decks in both built-in themes
+        run: |
+          for t in dark light; do
+            ./org2slides --theme "$t" --dist "public/$t" \
+              examples/minimal.org examples/showcase.org
+            python3 make_index.py --dist "public/$t" \
+              --title "org2slides — $t" \
+              --subtitle "The same two org files, built with --theme $t." \
+              --nav "← all themes=../"
+          done
+
+      - name: Verify outputs
+        run: |
+          for t in dark light; do
+            for d in minimal showcase; do
+              pages=$(pdfinfo "public/$t/${d}_beamer.pdf" | awk '/^Pages:/{print $2}')
+              echo "$t/${d}: ${pages} pages"
+              test "$pages" -ge 4
+              grep -q 'Reveal.initialize' "public/$t/${d}.html"
+              grep -q 'org2slides-theme.css' "public/$t/${d}.html"
+            done
+          done
+
+      - name: Root index (dark gallery + theme switcher)
+        run: |
+          cp -r public/dark/. public/
+          python3 make_index.py --dist public \
+            --title "org2slides — live examples" \
+            --subtitle "One org file per deck: present the HTML, hand out the PDF. Built-in dark and light themes." \
+            --nav "dark=dark/" --nav "light=light/" \
+            --source-url https://github.com/erelbng/org2slides
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: examples
+          path: public
+
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

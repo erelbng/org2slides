@@ -1,0 +1,47 @@
+% org2slides neutral dark theme -- no institution branding.
+% Matches the reveal.js "black" background (#191919) so dark diagrams blend.
+% Match the reveal.js side: Source Sans Pro is the font reveal's own
+% black/white themes ship, so HTML and PDF use the same typeface.
+\usepackage[T1]{fontenc}
+\usepackage[default]{sourcesanspro}
+
+\definecolor{o2sbg}{RGB}{25,25,25}
+\definecolor{o2sfg}{RGB}{236,238,240}
+\definecolor{o2saccent}{HTML}{4DA3FF}
+\definecolor{o2saccent2}{HTML}{7EE0C3}
+\colorlet{o2sdim}{o2sfg!55!o2sbg}
+\colorlet{o2srule}{o2sfg!45!o2sbg}
+
+\setbeamercolor{background canvas}{bg=o2sbg}
+\setbeamercolor{normal text}{fg=o2sfg,bg=o2sbg}
+\setbeamercolor{structure}{fg=o2saccent}
+\setbeamercolor{alerted text}{fg=o2saccent2}
+\setbeamercolor{example text}{fg=o2saccent2}
+\setbeamercolor{frametitle}{fg=o2sfg,bg=o2sbg}
+\setbeamercolor{title}{fg=o2sfg}
+\setbeamercolor{subtitle}{fg=o2sdim}
+\setbeamercolor{author}{fg=o2sdim}
+\setbeamercolor{date}{fg=o2sdim}
+\setbeamercolor{institute}{fg=o2sdim}
+\setbeamercolor{page number in head/foot}{fg=o2sdim}
+\setbeamercolor{block title}{fg=o2saccent,bg=o2sbg!85!white}
+\setbeamercolor{block body}{fg=o2sfg,bg=o2sbg!85!white}
+
+\setbeamerfont{title}{series=\bfseries,size=\LARGE}
+\setbeamerfont{subtitle}{series=\mdseries,size=\normalsize}
+\setbeamerfont{frametitle}{series=\bfseries,size=\large}
+
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize items}[circle]
+\setbeamertemplate{caption}[numbered]
+\setbeamertemplate{footline}[frame number]
+
+% Frame title with a short accent underline.
+\setbeamertemplate{frametitle}{%
+  \vspace*{0.45cm}%
+  {\usebeamerfont{frametitle}\usebeamercolor[fg]{frametitle}\insertframetitle\strut\par}%
+  \vspace*{-0.12cm}%
+  {\color{o2saccent}\rule{0.10\textwidth}{1.4pt}}\par
+}
+
+\hypersetup{colorlinks=true,linkcolor=o2sfg,urlcolor=o2saccent}

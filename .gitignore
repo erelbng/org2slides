@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.elc
+examples/revealjs/
+examples/*.html
+examples/*_beamer.pdf
+examples/assets/thumbnails/
+examples/assets/cropped/
+examples/assets/sanitized/
+examples/*.pdf
+!examples/assets/*.jpg
+examples/*-blx.bib
+examples/*.run.xml
+examples/assets/*.pdf
+org2slides-theme.css

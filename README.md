@@ -1,28 +1,20 @@
 # org2slides
 
+<div align="center">
 [![CI](https://github.com/erelbng/org2slides/actions/workflows/ci.yml/badge.svg)](https://github.com/erelbng/org2slides/actions/workflows/ci.yml)
-[Live example decks](https://erelbng.github.io/org2slides/) (built by the CI from `examples/`)
+</div>
 
-Forge a **reveal.js HTML presentation** and a **Beamer PDF** from a single
-org-mode deck — one command, no per-deck LaTeX hints.
+[Live examples](https://erelbng.github.io/org2slides/) (built by the CI from `examples/`)
+
+Forge a **reveal.js HTML presentation** and a **Beamer PDF** from a single org-mode deck — one command, no per-deck LaTeX hints.
 
 ```
 ./org2slides talk.org          # -> talk.html + talk_beamer.pdf
 ```
 
-The org deck stays the single source of truth: write it for reveal.js
-(`#+REVEAL_HTML:` layouts, CSS styling, videos, babel figures) and org2slides
-derives a matching Beamer PDF from the very same HTML/CSS hints — grid/flex
-containers become columns or image galleries, `object-fit: cover` becomes a
-crop, `border-radius` becomes rounded/circular clips, `font-size: N%` becomes
-a Beamer size group, videos become poster-frame thumbnails, font-awesome
-icons become `\faIcon`, SVGs become vector PDFs.
+The org deck stays the single source of truth: write it for reveal.js (`#+REVEAL_HTML:` layouts, CSS styling, videos, babel figures) and org2slides derives a matching Beamer PDF from the very same HTML/CSS hints — grid/flex containers become columns or image galleries, `object-fit: cover` becomes a crop, `border-radius` becomes rounded/circular clips, `font-size: N%` becomes a Beamer size group, videos become poster-frame thumbnails, font-awesome icons become `\faIcon`, SVGs become vector PDFs.
 
-Decks may live in **any directory** — outputs land next to the deck, the
-built-in PDF themes ship in this repository (resolved via `TEXINPUTS`), and
-ox-reveal/htmlize are vendored, so a bare `emacs-nox` is enough. That makes
-the repo cloneable straight into a CI pipeline (see below). Private or
-institutional themes stay in YOUR deck repository (see "Themes").
+Decks may live in **any directory** — outputs land next to the deck, the built-in PDF themes ship in this repository (resolved via `TEXINPUTS`), and ox-reveal/htmlize are vendored, so a bare `emacs-nox` is enough. That makes the repo cloneable straight into a CI pipeline (see below). Private or institutional themes stay in YOUR deck repository (see "Themes").
 
 ## Try it
 
@@ -32,15 +24,7 @@ Two self-contained example decks live in `examples/`:
 ./org2slides examples/minimal.org examples/showcase.org
 ```
 
-produces `examples/minimal.html` + `examples/minimal_beamer.pdf` (and the
-same for `showcase`) — reveal.js is downloaded into `examples/revealjs/` on
-the first run. `minimal.org` shows the basic workflow (grid layout, SVG,
-speaker notes); `showcase.org` exercises the whole converter (video poster
-frames, `object-fit: cover` galleries, circular avatars, font-awesome
-icons, code listings, font-size groups). Add `--theme light` to restyle
-both outputs; the
-[live demo](https://erelbng.github.io/org2slides/) shows every built-in
-theme, rebuilt from these two files on each push.
+produces `examples/minimal.html` + `examples/minimal_beamer.pdf` (and the same for `showcase`) — reveal.js is downloaded into `examples/revealjs/` on the first run. `minimal.org` shows the basic workflow (grid layout, SVG, speaker notes); `showcase.org` exercises the whole converter (video poster frames, `object-fit: cover` galleries, circular avatars, font-awesome icons, code listings, font-size groups). Add `--theme light` to restyle both outputs; the [live demo](https://erelbng.github.io/org2slides/) shows every built-in theme, rebuilt from these two files on each push.
 
 ## Command line
 
@@ -58,8 +42,7 @@ org2slides [options] deck.org [deck2.org ...]
   --light        shorthand for --theme light
 ```
 
-Environment knobs: `PDF_COMPRESS=0` (skip Ghostscript), `PDF_DPI` (default
-300), `PDF_JPEGQ` (default 95), `REVEAL_VERSION` (default 5.2.1).
+Environment knobs: `PDF_COMPRESS=0` (skip Ghostscript), `PDF_DPI` (default 300), `PDF_JPEGQ` (default 95), `REVEAL_VERSION` (default 5.2.1).
 
 Two things make exports reproducible on any machine:
 
@@ -70,11 +53,9 @@ Two things make exports reproducible on any machine:
   local directory that does not exist (fresh CI checkout — `revealjs/` is
   usually gitignored), org2slides fetches that reveal.js version there.
 
-## Minimal footprint (`--dist` / webdist.py)
+## Minimal footprint 
 
-GitLab has artifact/Pages size limits, and decks tend to reference 4K
-screen recordings. `--dist DIR` walks the exported HTML and copies **only
-the files it actually references** into `DIR`, shrinking media on the way:
+Some providers have artifact/Pages size limits, and decks tend to reference 4K screen recordings. `--dist DIR` walks the exported HTML and copies **only the files it actually references** into `DIR`, shrinking media on the way:
 
 * images larger than 1920 px are downscaled (quality 85),
 * videos wider than 1280 px **or fatter than 2500 kbit/s** are re-encoded
@@ -83,28 +64,21 @@ the files it actually references** into `DIR`, shrinking media on the way:
 * reveal's theme fonts are included (referenced from CSS, invisible to the
   HTML scan).
 
-Relative paths are preserved, so nothing in the HTML is rewritten; the
-folder is a complete website. For different budgets call webdist directly:
+Relative paths are preserved, so nothing in the HTML is rewritten; the folder is a complete website. For different budgets call webdist directly:
 
 ```
 python3 webdist.py --dist public --max-img 1600 --max-video 960 \
                    --crf 30 --max-kbps 1500 talk.html
 ```
 
-(Real-world data point: a deck whose referenced media weighed ~330 MB came
-out at 30 MB with the defaults.)
-
 ## Themes
 
-Built-ins (both neutral, no branding):
-
-| name | look |
-|---|---|
+| name             | look                                                           |
+|------------------|----------------------------------------------------------------|
 | `dark` (default) | matches reveal's black background (#191919), blue/teal accents |
-| `light` | its clean light counterpart |
+| `light`          | its clean light counterpart                                    |
 
-**Custom themes live with your decks, not here.** `--theme mytheme` looks for
-`themes/mytheme/` next to the deck (or under `$ORG2SLIDES_THEMES`) containing:
+**Custom themes live with your decks, not here.** `--theme mytheme` looks for `themes/mytheme/` next to the deck (or under `$ORG2SLIDES_THEMES`) containing:
 
 ```
 themes/mytheme/
@@ -120,21 +94,7 @@ themes/mytheme/
 #+BEAMER_HEADER: \colorlet{o2srule}{white!45}
 ```
 
-The theme directory is on `TEXINPUTS` during the pdflatex run, so the
-header can `\input`/`\usetheme` anything inside it. Define `o2srule`
-(the colour used for `<hr>` rules) to match your background; a grey
-fallback applies otherwise. This keeps institutional branding in the
-(possibly private) presentation repository — org2slides stays neutral.
-
-**The HTML follows the theme too.** With `--theme`, a matching stylesheet
-is copied next to the deck (`org2slides-theme.css`) and injected as an
-extra reveal stylesheet — colours AND typography mirror the PDF: both
-themes use Source Sans Pro on both sides (the PDF loads the
-`sourcesanspro` TeX package, reveal ships the webfont), and reveal's
-default UPPERCASE headings are turned off to match the frame titles. Built-ins ship theirs in `theme/reveal_<name>.css`;
-a custom theme provides an optional `themes/<name>/reveal.css`. The source
-deck is never modified, and its own `#+REVEAL_EXTRA_CSS` files keep working.
-Without `--theme`, the HTML export is untouched.
+**The HTML follows the theme too.** With `--theme`, a matching stylesheet is copied next to the deck (`org2slides-theme.css`) and injected as an extra reveal stylesheet — colours AND typography mirror the PDF: both themes use Source Sans Pro on both sides (the PDF loads the `sourcesanspro` TeX package, reveal ships the webfont), and reveal's default UPPERCASE headings are turned off to match the frame titles. Built-ins ship theirs in `theme/reveal_<name>.css`; a custom theme provides an optional `themes/<name>/reveal.css`. The source deck is never modified, and its own `#+REVEAL_EXTRA_CSS` files keep working. Without `--theme`, the HTML export is untouched.
 
 ## Emacs integration
 
@@ -158,8 +118,8 @@ or with `use-package`:
 
 Then, in a deck buffer:
 
-| Command                              | Effect                               |
-|--------------------------------------|--------------------------------------|
+| Command                               | Effect                               |
+|---------------------------------------|--------------------------------------|
 | `M-x org2slides-export` (`C-c b`)     | HTML + PDF, opens the PDF when done  |
 | `C-u M-x org2slides-export`           | same, keep intermediates (`--debug`) |
 | `M-x org2slides-export-pdf` / `-html` | one backend only                     |
@@ -168,23 +128,19 @@ Everything is also in the org export dispatcher, `C-c C-e s`:
 `s` HTML + PDF · `h` HTML · `p` PDF · `d` PDF debug · `l` PDF light theme ·
 `t` PDF with chosen theme (built-in or custom).
 
-Builds run asynchronously in a `*org2slides*` compilation buffer — Emacs
-stays usable, errors are jumpable. Customize `org2slides-extra-args`
-(e.g. `("--theme" "mytheme")`) and `org2slides-open-output`.
+Builds run asynchronously in a `*org2slides*` compilation buffer — Emacs stays usable, errors are jumpable. Customize `org2slides-extra-args` (e.g. `("--theme" "mytheme")`) and `org2slides-open-output`.
 
-Your interactive `C-c C-e R R` (ox-reveal) export keeps working as before —
-org2slides does not touch org configuration.
+Your interactive `C-c C-e R R` (ox-reveal) export keeps working as before — org2slides does not touch org configuration.
 
 ## CI integration
 
-### GitLab — the included template (recommended)
+### GitLab
 
-This repository ships `ci/org2slides.gitlab-ci.yml` with ready-made hidden
-jobs. A presentation repository's `.gitlab-ci.yml` becomes:
+This repository ships `ci/org2slides.gitlab-ci.yml` with ready-made hidden jobs. A presentation repository's `.gitlab-ci.yml` becomes:
 
 ```yaml
 include:
-  - project: 'you/org2slides'            # adjust: where org2slides lives
+  - project: 'you/org2slides'           # adjust: where org2slides lives
     file: 'ci/org2slides.gitlab-ci.yml'
 
 pages:                                  # publish all decks via GitLab Pages
@@ -194,8 +150,7 @@ export:                                 # and/or downloadable HTML+PDF artifacts
   extends: .org2slides-export
 ```
 
-That's the whole pipeline — repeat those five lines in every presentation
-repository. Override per project:
+That's the whole pipeline — repeat those five lines in every presentation repository. Override per project:
 
 ```yaml
 pages:
@@ -205,18 +160,7 @@ pages:
     ORG2SLIDES_REPO: "https://gitlab.example.com/you/org2slides.git"
 ```
 
-`.org2slides-pages` builds into `public/` via `--dist` (minimal, self-
-contained) and caches re-encoded videos between pipelines (`webdist.py
---reuse`); bump the cache key after replacing a video under the same name.
-`.org2slides-export` uploads the plain HTML + PDF next to the sources.
-
-If org2slides is private, either make it public to project members
-("internal"), or clone with a token:
-`git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.example.com/you/org2slides.git`
-(grant the presentation project access under org2slides → Settings → CI/CD →
-Job token permissions).
-
-### GitLab — hand-rolled job
+`.org2slides-pages` builds into `public/` via `--dist` (minimal, self-contained) and caches re-encoded videos between pipelines (`webdist.py --reuse`); bump the cache key after replacing a video under the same name. `.org2slides-export` uploads the plain HTML + PDF next to the sources.
 
 Without the include, any job boils down to:
 
@@ -235,11 +179,6 @@ pages:
   artifacts:
     paths: [public]
 ```
-
-Tip for many pipelines: bake the `before_script` apt layer into a small
-registry image once (`FROM debian:trixie-slim` + the same `apt-get install`)
-and set `image:` to it — saves ~2 min of package installation per job.
-
 ### GitHub Actions
 
 ```yaml
@@ -261,8 +200,6 @@ jobs:
 
 ## Requirements
 
-Debian/Ubuntu names — everything is detected at runtime, no configuration:
-
 - `emacs-nox` (org ships with it; ox-reveal + htmlize are vendored in
   `vendor/`)
 - `texlive-latex-extra texlive-fonts-extra texlive-pictures
@@ -277,19 +214,7 @@ Debian/Ubuntu names — everything is detected at runtime, no configuration:
   `imagemagick` (crops, downscaling), `ghostscript` + `poppler-utils`
   (PDF compression), `curl` (reveal.js auto-download)
 
-## Repository layout
-
-```
-org2slides                 main entry point (bash)
-convert_to_beamer.py      reveal org -> beamer org converter (the clever part)
-webdist.py                HTML -> self-contained minimal website bundler
-org2slides.el              Emacs front-end (M-x org2slides-export, C-c C-e s)
-ci/org2slides.gitlab-ci.yml  reusable GitLab CI jobs (include + extends)
-theme/                    built-in neutral Beamer themes
-vendor/                   ox-reveal.el, htmlize.el (GPL; vendored for batch/CI)
-```
-
-## Known limitations (reveal → PDF)
+## Known limitations
 
 - `<iframe>` embeds → `[Interactive: …]` placeholder.
 - Videos → static poster-frame thumbnail.

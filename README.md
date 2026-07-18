@@ -1,7 +1,9 @@
 # org2slides
 
 <div align="center">
+
 [![CI](https://github.com/erelbng/org2slides/actions/workflows/ci.yml/badge.svg)](https://github.com/erelbng/org2slides/actions/workflows/ci.yml)
+
 </div>
 
 [Live examples](https://erelbng.github.io/org2slides/) (built by the CI from `examples/`)
@@ -214,7 +216,7 @@ jobs:
   `imagemagick` (crops, downscaling), `ghostscript` + `poppler-utils`
   (PDF compression), `curl` (reveal.js auto-download)
 
-## Known limitations
+## Known limitations (reveal → PDF)
 
 - `<iframe>` embeds → `[Interactive: …]` placeholder.
 - Videos → static poster-frame thumbnail.
